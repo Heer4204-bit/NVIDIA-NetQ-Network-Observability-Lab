@@ -65,36 +65,67 @@ NVIDIA-NetQ-Network-Observability-Lab/
 ├── backend/
 
 │   ├── app.py
+
 │   └── network_monitor.py
+
 │
+
 ├── css/
+
 │   └── style.css
+
 │
+
 ├── data/
+
 │   └── network_telemetry.json
+
 │
+
 ├── docs/
+
 │   ├── deployment-guide.md
+
 │   └── troubleshooting-guide.md
+
 │
+
 ├── js/
+
 │   ├── dashboard.js
+
 │   ├── topology.js
+
 │   └── monitoring.js
+
 │
+
 ├── screenshots/
+
 │   ├── dashboard-overview.jpg
+
 │   ├── network-topology.jpg
+
 │   ├── fault-injection-lab.jpg
+
 │   └── netq-cli-diagnostics.jpg
+
 │
+
 ├── .gitignore
+
 ├── LICENSE
+
 ├── README.md
+
 ├── index.html
+
 ├── dashboard.html
+
 ├── topology.html
+
 ├── alerts.html
+
 └── troubleshooting.html
 
 # ⚙️ Getting Started
