@@ -37,7 +37,7 @@ It is designed to help learners understand network monitoring, troubleshooting, 
 
 2. Network Topology
 
-<img width="4320" height="2460" alt="16142" src="https://github.com/user-attachments/assets/f9443fe3-b024-4b22-b23b-747836619067" /><
+<img width="4320" height="2460" alt="16142" src="https://github.com/user-attachments/assets/f9443fe3-b024-4b22-b23b-747836619067" />
 
 3. Fault Injection Lab
 
