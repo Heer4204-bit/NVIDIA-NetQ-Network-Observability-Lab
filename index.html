@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NVIDIA NetQ Network Observability Lab</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Font Awesome for crisp enterprise icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            nv: {
+              green: '#76b900',
+              greenHover: '#87d400',
+              greenDim: 'rgba(118, 185, 0, 0.14)',
+              bg: '#0d1117',
+              panel: '#161b22',
+              panelAlt: '#1c2128',
+              border: '#30363d',
+              text: '#e6edf3',
+              muted: '#8b949e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars for Enterprise Terminal & Panels */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1117;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #30363d;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #76b900;
+    }
+
+    /* Animated Data Flow Dashes on SVG Links */
+    @keyframes flowDash {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+    .link-flow-healthy {
+      stroke-dasharray: 6 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+    .link-flow-warn {
+      stroke-dasharray: 4 8;
+      animation: flowDash 2.2s linear infinite;
+    }
+
+    /* Subtle Pulse for Active Node & Alarms */
+    @keyframes pulseRing {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      70% { transform: scale(1.12); opacity: 0; }
+      100% { transform: scale(1.12); opacity: 0; }
+    }
+    .node-selected-ring {
+      transform-origin: center;
+      transform-box: fill-box;
+      animation: pulseRing 2s infinite;
+    }
+
+    /* Terminal Cursor Blink */
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    .cursor-blink {
+      animation: blink 1s infinite;
+    }
+  </style>
+</head>
+<body class="bg-nv-bg text-nv-text font-sans antialiased selection:bg-nv-green selection:text-black min-h-screen flex flex-col">
+
+  <!-- Top Enterprise Navigation Bar -->
+  <header class="bg-nv-panel border-b border-nv-border sticky top-0 z-30">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <!-- Left: NVIDIA NetQ Brand Identity -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-nv-green/15 border border-nv-green/40 flex items-center justify-center text-nv-green shadow-[0_0_15px_rgba(118,185,0,0.2)]">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold tracking-tight text-base sm:text-lg text-white">NVIDIA <span class="text-nv-green">NetQ</span></span>
+            <span class="hidden sm:inline-block text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-nv-panelAlt border border-nv-border text-nv-muted">v4.12.0 Enterprise</span>
+          </div>
+          <p class="text-xs text-nv-muted hidden md:block">AI Ethernet Fabric Observability &amp; RoCEv2 Telemetry Lab</p>
+        </div>
+      </div>
+
+      <!-- Center: Fabric Status Pill -->
+      <div class="hidden lg:flex items-center gap-6 bg-nv-bg/80 border border-nv-border px-4 py-1.5 rounded-full text-xs">
+        <div class="flex items-center gap-2">
+          <span id="global-status-dot" class="w-2.5 h-2.5 rounded-full bg-nv-green shadow-[0_0_8px_#76b900]"></span>
+          <span class="text-nv-muted">Fabric:</span>
+          <span id="global-fabric-name" class="font-mono font-semibold text-white">DC1-AI-POD01</span>
+        </div>
+        <div class="h-3.5 w-[1px] bg-nv-border"></div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-nv-muted">Switches:</span>
+          <span class="font-mono text-white font-medium">6/6 Online (Spectrum-4 SN5600)</span>
+        </div>
+        <div class="h-3.5 w-[1px] bg-nv-border"></div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-nv-muted">Telemetry Stream:</span>
+          <span class="font-mono text-nv-green font-medium">WJH + What Just Happened (100Hz)</span>
+        </div>
+      </div>
+
+      <!-- Right: Primary Validation Action & Clock -->
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:flex flex-col items-end text-right mr-1">
+          <span class="text-[11px] text-nv-muted uppercase tracking-wider">System UTC</span>
+          <span id="utc-clock" class="font-mono text-xs text-white">--:--:-- UTC</span>
+        </div>
+        <button id="btn-run-validation" onclick="runFullValidation()" class="bg-nv-green hover:bg-nv-greenHover active:scale-[0.98] text-black font-semibold text-xs sm:text-sm px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(118,185,0,0.25)] cursor-pointer">
+          <i id="val-btn-icon" class="fa-solid fa-shield-check"></i>
+          <span>Run Full Fabric Validation</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toast / Message Banner (Replaces alert() with sleek inline notification) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0"></div>
+
+  <!-- Main Dashboard Workspace -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+    <!-- Section 1: Network Validation & Health Checks Status Cards -->
+    <section aria-label="Network Validation Health Checks">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-nv-muted">Fabric Validation &amp; Assurance Matrix</h2>
+          <span id="last-validated-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-nv-panel border border-nv-border text-nv-muted">Last check: Just now</span>
+        </div>
+        <div class="text-xs text-nv-muted flex items-center gap-4">
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-nv-green"></span> Healthy</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-400"></span> Degraded / Warning</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Critical Fault</span>
+        </div>
+      </div>
+
+      <div id="health-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </section>
+
+    <!-- Section 2: Fault Injection / Scenario Lab Bar -->
+    <section class="bg-nv-panel border border-nv-border rounded-xl p-4 shadow-sm">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="flex items-start sm:items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 sm:mt-0">
+            <i class="fa-solid fa-flask-vial"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-semibold text-white">Chaos &amp; Fault Injection Lab</h3>
+              <span id="active-scenario-pill" class="text-[11px] font-mono px-2 py-0.5 rounded bg-nv-green/15 text-nv-green border border-nv-green/30">ACTIVE: Nominal Baseline</span>
+            </div>
+            <p class="text-xs text-nv-muted mt-0.5">Inject live data-center anomalies to observe real-time NetQ telemetry shifts, WJH packet drops, and CLI diagnostics.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="applyScenario('bgp_flap')" id="scen-bgp_flap" class="scenario-btn px-3 py-2 rounded-lg text-xs font-medium bg-nv-panelAlt hover:bg-rose-500/15 text-nv-text hover:text-rose-300 border border-nv-border hover:border-rose-500/40 transition-all flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-diagram-project text-rose-400"></i>
+            <span>Simulate BGP Flap (Leaf-02)</span>
+          </button>
+          <button onclick="applyScenario('crc_errors')" id="scen-crc_errors" class="scenario-btn px-3 py-2 rounded-lg text-xs font-medium bg-nv-panelAlt hover:bg-amber-500/15 text-nv-text hover:text-amber-300 border border-nv-border hover:border-amber-500/40 transition-all flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-wave-square text-amber-400"></i>
+            <span>Inject Link CRC Errors</span>
+          </button>
+          <button onclick="applyScenario('pfc_watchdog')" id="scen-pfc_watchdog" class="scenario-btn px-3 py-2 rounded-lg text-xs font-medium bg-nv-panelAlt hover:bg-rose-500/15 text-nv-text hover:text-rose-300 border border-nv-border hover:border-rose-500/40 transition-all flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-gauge-high text-rose-400"></i>
+            <span>Simulate PFC Watchdog Trigger</span>
+          </button>
+          <button onclick="applyScenario('healthy')" id="scen-healthy" class="scenario-btn px-3 py-2 rounded-lg text-xs font-semibold bg-nv-green/15 hover:bg-nv-green/25 text-nv-green border border-nv-green/40 transition-all flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>Restore Healthy Fabric</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Main Interactive Grid (Topology Visualizer + Node Inspector) -->
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+      
+      <!-- Left 8 Cols: Interactive Spine-Leaf Fabric Topology Visualizer -->
+      <div class="xl:col-span-8 bg-nv-panel border border-nv-border rounded-xl flex flex-col overflow-hidden">
+        <div class="px-4 py-3 border-b border-nv-border flex flex-wrap items-center justify-between gap-2 bg-nv-panelAlt/50">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-network-wired text-nv-green text-sm"></i>
+            <h3 class="text-sm font-semibold text-white">Clos Spine-Leaf Fabric Topology (400GbE / 800GbE RoCEv2)</h3>
+          </div>
+          <div class="flex items-center gap-3 text-[11px] font-mono text-nv-muted">
+            <span>Click any switch or host to inspect live telemetry</span>
+          </div>
+        </div>
+
+        <!-- Responsive SVG Topology Canvas -->
+        <div class="relative flex-1 bg-[#0a0e14] min-h-[380px] sm:min-h-[430px] flex items-center justify-center p-2 select-none">
+          <!-- Background Subtle Tech Grid -->
+          <div class="absolute inset-0 opacity-20 pointer-events-none" style="background-image: radial-gradient(#30363d 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+          <svg id="fabric-svg" viewBox="0 0 860 440" class="w-full h-full max-h-[450px] relative z-10">
+            <defs>
+              <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3.5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Layer Labels on Left -->
+            <text x="16" y="68" fill="#8b949e" font-size="11" font-family="JetBrains Mono, monospace" font-weight="600">SPINE LAYER</text>
+            <text x="16" y="83" fill="#484f58" font-size="10" font-family="JetBrains Mono, monospace">SN5600 800GbE</text>
+
+            <text x="16" y="218" fill="#8b949e" font-size="11" font-family="JetBrains Mono, monospace" font-weight="600">LEAF / TOR</text>
+            <text x="16" y="233" fill="#484f58" font-size="10" font-family="JetBrains Mono, monospace">SN5600 VTEP</text>
+
+            <text x="16" y="368" fill="#8b949e" font-size="11" font-family="JetBrains Mono, monospace" font-weight="600">COMPUTE NODES</text>
+            <text x="16" y="383" fill="#484f58" font-size="10" font-family="JetBrains Mono, monospace">DGX H100 / BlueField-3</text>
+
+            <!-- Dynamic Links Group -->
+            <g id="topology-links"></g>
+
+            <!-- Dynamic Nodes Group -->
+            <g id="topology-nodes"></g>
+          </svg>
+        </div>
+
+        <!-- Topology Footer Legend -->
+        <div class="px-4 py-2.5 bg-nv-panelAlt/40 border-t border-nv-border flex flex-wrap items-center justify-between gap-2 text-xs text-nv-muted">
+          <div class="flex flex-wrap items-center gap-4">
+            <span class="flex items-center gap-1.5"><span class="w-4 h-0.5 bg-nv-green inline-block"></span> 800G ISL Active</span>
+            <span class="flex items-center gap-1.5"><span class="w-4 h-0.5 bg-amber-400 inline-block"></span> High CRC / FEC Corrected</span>
+            <span class="flex items-center gap-1.5"><span class="w-4 h-0.5 bg-rose-500 inline-block"></span> BGP Down / PFC Pause Storm</span>
+          </div>
+          <span class="font-mono text-[11px]">ASNs: Spines 65000 | Leaves 65101–65104</span>
+        </div>
+      </div>
+
+      <!-- Right 4 Cols: Selected Switch / Node Live Telemetry Inspector -->
+      <div class="xl:col-span-4 bg-nv-panel border border-nv-border rounded-xl flex flex-col justify-between">
+        <div>
+          <div class="px-4 py-3 border-b border-nv-border flex items-center justify-between bg-nv-panelAlt/50">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-microchip text-nv-green text-sm"></i>
+              <h3 class="text-sm font-semibold text-white">Node Telemetry Inspector</h3>
+            </div>
+            <span id="inspector-node-role" class="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-nv-green/15 text-nv-green border border-nv-green/30">LEAF SWITCH</span>
+          </div>
+
+          <div class="p-4 space-y-4">
+            <!-- Node Header Info -->
+            <div class="flex items-start justify-between gap-2 pb-3 border-b border-nv-border">
+              <div>
+                <h4 id="inspector-name" class="text-lg font-bold text-white font-mono">leaf-02.dc1.nv</h4>
+                <p id="inspector-model" class="text-xs text-nv-muted">NVIDIA Spectrum-4 SN5600 | Cumulus Linux 5.9</p>
+              </div>
+              <span id="inspector-health-badge" class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-nv-green/15 text-nv-green border border-nv-green/30">
+                HEALTHY
+              </span>
+            </div>
+
+            <!-- Key Identifiers Grid -->
+            <div class="grid grid-cols-2 gap-2.5 text-xs">
+              <div class="bg-nv-bg p-2.5 rounded-lg border border-nv-border">
+                <span class="text-nv-muted block text-[11px]">Loopback / VTEP IP</span>
+                <span id="inspector-vtep" class="font-mono font-semibold text-white">10.255.0.12</span>
+              </div>
+              <div class="bg-nv-bg p-2.5 rounded-lg border border-nv-border">
+                <span class="text-nv-muted block text-[11px]">BGP ASN / EVPN</span>
+                <span id="inspector-bgp" class="font-mono font-semibold text-nv-green">AS 65102 (4/4 Est)</span>
+              </div>
+              <div class="bg-nv-bg p-2.5 rounded-lg border border-nv-border">
+                <span class="text-nv-muted block text-[11px]">ASIC Temp / Fan</span>
+                <span id="inspector-temp" class="font-mono font-semibold text-white">48°C / 6,400 RPM</span>
+              </div>
+              <div class="bg-nv-bg p-2.5 rounded-lg border border-nv-border">
+                <span class="text-nv-muted block text-[11px]">Uptime / NetQ Agent</span>
+                <span id="inspector-uptime" class="font-mono font-semibold text-white">42d 18h (Fresh)</span>
+              </div>
+            </div>
+
+            <!-- Resource Utilization Bars (CPU, Memory, Shared ASIC Buffer) -->
+            <div class="space-y-3 pt-1">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-nv-muted">Control Plane CPU (x86)</span>
+                  <span id="inspector-cpu-val" class="font-mono font-semibold text-white">18%</span>
+                </div>
+                <div class="w-full h-2 bg-nv-bg rounded-full overflow-hidden border border-nv-border">
+                  <div id="inspector-cpu-bar" class="h-full bg-nv-green transition-all duration-500" style="width: 18%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-nv-muted">System Memory Utilization</span>
+                  <span id="inspector-mem-val" class="font-mono font-semibold text-white">34% (10.8 / 32 GB)</span>
+                </div>
+                <div class="w-full h-2 bg-nv-bg rounded-full overflow-hidden border border-nv-border">
+                  <div id="inspector-mem-bar" class="h-full bg-nv-green transition-all duration-500" style="width: 34%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-nv-muted">Spectrum-4 MMU Buffer Pool</span>
+                  <span id="inspector-buf-val" class="font-mono font-semibold text-white">22% (35 / 160 MB)</span>
+                </div>
+                <div class="w-full h-2 bg-nv-bg rounded-full overflow-hidden border border-nv-border">
+                  <div id="inspector-buf-bar" class="h-full bg-nv-green transition-all duration-500" style="width: 22%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Port / Interface Telemetry Table -->
+            <div>
+              <h5 class="text-[11px] font-semibold uppercase tracking-wider text-nv-muted mb-2">Active Uplinks &amp; Host Ports</h5>
+              <div id="inspector-ports-list" class="space-y-1.5 max-h-[145px] overflow-y-auto pr-1 font-mono text-xs">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick CLI Action for Selected Node -->
+        <div class="px-4 py-3 border-t border-nv-border bg-nv-panelAlt/40 flex items-center justify-between gap-2">
+          <span class="text-xs text-nv-muted">Inspect in NetQ CLI:</span>
+          <button onclick="inspectSelectedNodeInCli()" class="text-xs font-mono bg-nv-bg hover:bg-nv-green/15 text-nv-green border border-nv-border hover:border-nv-green/40 px-2.5 py-1.5 rounded transition-all cursor-pointer">
+            netq <span id="inspector-cli-node">leaf-02</span> show lldp
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Simulated NetQ CLI Terminal + Live Telemetry Charts -->
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+
+      <!-- Left 7 Cols: Simulated NetQ CLI Terminal Emulator -->
+      <div class="xl:col-span-7 bg-[#090c10] border border-nv-border rounded-xl flex flex-col overflow-hidden shadow-lg">
+        <!-- Terminal Window Titlebar -->
+        <div class="px-4 py-2.5 bg-nv-panel border-b border-nv-border flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 mr-2">
+              <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+              <span class="w-3 h-3 rounded-full bg-amber-400/80"></span>
+              <span class="w-3 h-3 rounded-full bg-nv-green/80"></span>
+            </div>
+            <span class="font-mono text-xs font-semibold text-white">netq-ts-01.dc1.nv — NetQ CLI Shell</span>
+          </div>
+          <button onclick="clearTerminal()" class="text-[11px] font-mono text-nv-muted hover:text-white px-2 py-0.5 rounded border border-nv-border hover:border-nv-muted transition-colors cursor-pointer">
+            Clear Output
+          </button>
+        </div>
+
+        <!-- Preset NetQ Command Chips -->
+        <div class="px-3 py-2 bg-nv-panelAlt/60 border-b border-nv-border flex flex-wrap items-center gap-1.5">
+          <span class="text-[11px] text-nv-muted mr-1 font-medium">Presets:</span>
+          <button onclick="executeNetqCommand('netq show agents')" class="cmd-chip text-[11px] font-mono px-2 py-1 rounded bg-nv-bg hover:bg-nv-green/15 text-nv-text hover:text-nv-green border border-nv-border hover:border-nv-green/40 transition-colors cursor-pointer">netq show agents</button>
+          <button onclick="executeNetqCommand('netq check bgp')" class="cmd-chip text-[11px] font-mono px-2 py-1 rounded bg-nv-bg hover:bg-nv-green/15 text-nv-text hover:text-nv-green border border-nv-border hover:border-nv-green/40 transition-colors cursor-pointer">netq check bgp</button>
+          <button onclick="executeNetqCommand('netq check evpn')" class="cmd-chip text-[11px] font-mono px-2 py-1 rounded bg-nv-bg hover:bg-nv-green/15 text-nv-text hover:text-nv-green border border-nv-border hover:border-nv-green/40 transition-colors cursor-pointer">netq check evpn</button>
+          <button onclick="executeNetqCommand('netq trace 10.1.1.10 from 10.1.2.20')" class="cmd-chip text-[11px] font-mono px-2 py-1 rounded bg-nv-bg hover:bg-nv-green/15 text-nv-text hover:text-nv-green border border-nv-border hover:border-nv-green/40 transition-colors cursor-pointer">netq trace 10.1.1.10 from 10.1.2.20</button>
+          <button onclick="executeNetqCommand('netq show sensors')" class="cmd-chip text-[11px] font-mono px-2 py-1 rounded bg-nv-bg hover:bg-nv-green/15 text-nv-text hover:text-nv-green border border-nv-border hover:border-nv-green/40 transition-colors cursor-pointer">netq show sensors</button>
+          <button onclick="executeNetqCommand('netq check mtu')" class="cmd-chip text-[11px] font-mono px-2 py-1 rounded bg-nv-bg hover:bg-nv-green/15 text-nv-text hover:text-nv-green border border-nv-border hover:border-nv-green/40 transition-colors cursor-pointer">netq check mtu</button>
+        </div>
+
+        <!-- Terminal Scrollback Output Area -->
+        <div id="terminal-output" class="p-4 font-mono text-xs leading-relaxed h-[330px] overflow-y-auto space-y-3 text-gray-200" onclick="document.getElementById('terminal-input').focus()">
+          <!-- Initial welcome banner injected by JS -->
+        </div>
+
+        <!-- Interactive Command Input Prompt -->
+        <form id="terminal-form" class="px-4 py-2.5 bg-nv-panel border-t border-nv-border flex items-center gap-2 font-mono text-xs">
+          <span class="text-nv-green font-semibold select-none">cumulus@netq-ts-01:~$</span>
+          <input
+            id="terminal-input"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Type a NetQ command (e.g., netq check bgp, help)..."
+            class="flex-1 bg-transparent text-white focus:outline-none placeholder:text-nv-muted/50"
+          />
+          <button type="submit" class="px-2.5 py-1 rounded bg-nv-green/20 hover:bg-nv-green/30 text-nv-green font-semibold transition-colors cursor-pointer">
+            Run
+          </button>
+        </form>
+      </div>
+
+      <!-- Right 5 Cols: Live Telemetry & RoCEv2 Congestion Canvas Charts -->
+      <div class="xl:col-span-5 flex flex-col gap-5">
+        
+        <!-- Chart 1: East-West Leaf-Spine Throughput (Gbps) -->
+        <div class="bg-nv-panel border border-nv-border rounded-xl p-4 flex-1 flex flex-col justify-between">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-nv-green"></span>
+                East-West Fabric Throughput
+              </h3>
+              <p class="text-[11px] text-nv-muted">Aggregate Leaf-Spine AI AllReduce Traffic (Tbps)</p>
+            </div>
+            <div class="text-right font-mono">
+              <span id="throughput-live-val" class="text-base font-bold text-nv-green">3.84 Tbps</span>
+              <span class="block text-[10px] text-nv-muted">Cap: 6.40 Tbps</span>
+            </div>
+          </div>
+          <div class="relative w-full h-[135px]">
+            <canvas id="throughput-canvas" class="w-full h-full block"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: RoCEv2 Lossless Fabric ECN & PFC Metrics -->
+        <div class="bg-nv-panel border border-nv-border rounded-xl p-4 flex-1 flex flex-col justify-between">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                RoCEv2 ECN Marking &amp; PFC Pause Frames
+              </h3>
+              <p class="text-[11px] text-nv-muted">DCQCN Congestion Control Telemetry (pkts/sec)</p>
+            </div>
+            <div class="flex items-center gap-3 font-mono text-xs">
+              <div>
+                <span class="text-cyan-400 block font-semibold" id="ecn-live-val">14.2k/s</span>
+                <span class="text-[10px] text-nv-muted">ECN CE</span>
+              </div>
+              <div>
+                <span class="text-amber-400 block font-semibold" id="pfc-live-val">0/s</span>
+                <span class="text-[10px] text-nv-muted">PFC Pause</span>
+              </div>
+            </div>
+          </div>
+          <div class="relative w-full h-[135px]">
+            <canvas id="roce-canvas" class="w-full h-full block"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-nv-border bg-nv-panel/60 py-3 px-4 sm:px-6 text-xs text-nv-muted">
+    <div class="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>NVIDIA NetQ Network Observability Lab &bull; Simulated Spectrum-X AI Ethernet Reference Architecture</span>
+      <span class="font-mono text-[11px]">Streaming Telemetry: gNMI / WJH / NetQ Agent</span>
+    </div>
+  </footer>
+
+  <!-- Interactive Application Logic -->
+  <script>
+    /**
+     * ============================================================================
+     * 1. STATE & FABRIC DATA MODEL
+     * ============================================================================
+     */
+    const state = {
+      selectedNodeId: 'leaf-02',
+      activeScenario: 'healthy', // 'healthy' | 'bgp_flap' | 'crc_errors' | 'pfc_watchdog'
+      commandHistory: [],
+      historyIndex: -1,
+      telemetrySeries: {
+        throughput: Array.from({ length: 32 }, (_, i) => 3.7 + Math.sin(i * 0.4) * 0.25),
+        ecn: Array.from({ length: 32 }, (_, i) => 12 + Math.cos(i * 0.5) * 3),
+        pfc: Array.from({ length: 32 }, () => 0),
+      },
+      nodes: {
+        'spine-01': {
+          id: 'spine-01',
+          label: 'spine-01',
+          hostname: 'spine-01.dc1.nv',
+          role: 'SPINE SWITCH',
+          layer: 'spine',
+          x: 310, y: 65,
+          model: 'NVIDIA Spectrum-4 SN5600 | Cumulus Linux 5.9',
+          vtep: '10.255.0.1 (RR)',
+          asn: 'AS 65000',
+          bgpSummary: '4/4 Established',
+          temp: '46°C / 6,100 RPM',
+          uptime: '68d 11h (Fresh)',
+          cpu: 14,
+          mem: 29,
+          memDetail: '9.2 / 32 GB',
+          buffer: 18,
+          bufferDetail: '28 / 160 MB',
+          status: 'healthy',
+          ports: [
+            { name: 'swp1', peer: 'leaf-01:swp49', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp2', peer: 'leaf-02:swp49', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp3', peer: 'leaf-03:swp49', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp4', peer: 'leaf-04:swp49', speed: '800G', status: 'UP', crc: 0 },
+          ]
+        },
+        'spine-02': {
+          id: 'spine-02',
+          label: 'spine-02',
+          hostname: 'spine-02.dc1.nv',
+          role: 'SPINE SWITCH',
+          layer: 'spine',
+          x: 610, y: 65,
+          model: 'NVIDIA Spectrum-4 SN5600 | Cumulus Linux 5.9',
+          vtep: '10.255.0.2 (RR)',
+          asn: 'AS 65000',
+          bgpSummary: '4/4 Established',
+          temp: '47°C / 6,250 RPM',
+          uptime: '68d 11h (Fresh)',
+          cpu: 15,
+          mem: 30,
+          memDetail: '9.6 / 32 GB',
+          buffer: 19,
+          bufferDetail: '30 / 160 MB',
+          status: 'healthy',
+          ports: [
+            { name: 'swp1', peer: 'leaf-01:swp50', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp2', peer: 'leaf-02:swp50', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp3', peer: 'leaf-03:swp50', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp4', peer: 'leaf-04:swp50', speed: '800G', status: 'UP', crc: 0 },
+          ]
+        },
+        'leaf-01': {
+          id: 'leaf-01',
+          label: 'leaf-01',
+          hostname: 'leaf-01.dc1.nv',
+          role: 'LEAF / VTEP',
+          layer: 'leaf',
+          x: 205, y: 215,
+          model: 'NVIDIA Spectrum-4 SN5600 | Cumulus Linux 5.9',
+          vtep: '10.255.0.11',
+          asn: 'AS 65101',
+          bgpSummary: '2/2 Established',
+          temp: '49°C / 6,500 RPM',
+          uptime: '42d 18h (Fresh)',
+          cpu: 19,
+          mem: 35,
+          memDetail: '11.2 / 32 GB',
+          buffer: 24,
+          bufferDetail: '38 / 160 MB',
+          status: 'healthy',
+          ports: [
+            { name: 'swp49', peer: 'spine-01:swp1', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp50', peer: 'spine-02:swp1', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp1', peer: 'dgx-h100-01', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        },
+        'leaf-02': {
+          id: 'leaf-02',
+          label: 'leaf-02',
+          hostname: 'leaf-02.dc1.nv',
+          role: 'LEAF / VTEP',
+          layer: 'leaf',
+          x: 375, y: 215,
+          model: 'NVIDIA Spectrum-4 SN5600 | Cumulus Linux 5.9',
+          vtep: '10.255.0.12',
+          asn: 'AS 65102',
+          bgpSummary: '2/2 Established',
+          temp: '48°C / 6,400 RPM',
+          uptime: '42d 18h (Fresh)',
+          cpu: 18,
+          mem: 34,
+          memDetail: '10.8 / 32 GB',
+          buffer: 22,
+          bufferDetail: '35 / 160 MB',
+          status: 'healthy',
+          ports: [
+            { name: 'swp49', peer: 'spine-01:swp2', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp50', peer: 'spine-02:swp2', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp1', peer: 'dgx-h100-02', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        },
+        'leaf-03': {
+          id: 'leaf-03',
+          label: 'leaf-03',
+          hostname: 'leaf-03.dc1.nv',
+          role: 'LEAF / VTEP',
+          layer: 'leaf',
+          x: 545, y: 215,
+          model: 'NVIDIA Spectrum-4 SN5600 | Cumulus Linux 5.9',
+          vtep: '10.255.0.13',
+          asn: 'AS 65103',
+          bgpSummary: '2/2 Established',
+          temp: '50°C / 6,600 RPM',
+          uptime: '42d 18h (Fresh)',
+          cpu: 21,
+          mem: 36,
+          memDetail: '11.5 / 32 GB',
+          buffer: 25,
+          bufferDetail: '40 / 160 MB',
+          status: 'healthy',
+          ports: [
+            { name: 'swp49', peer: 'spine-01:swp3', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp50', peer: 'spine-02:swp3', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp1', peer: 'dgx-h100-03', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        },
+        'leaf-04': {
+          id: 'leaf-04',
+          label: 'leaf-04',
+          hostname: 'leaf-04.dc1.nv',
+          role: 'LEAF / VTEP',
+          layer: 'leaf',
+          x: 715, y: 215,
+          model: 'NVIDIA Spectrum-4 SN5600 | Cumulus Linux 5.9',
+          vtep: '10.255.0.14',
+          asn: 'AS 65104',
+          bgpSummary: '2/2 Established',
+          temp: '48°C / 6,420 RPM',
+          uptime: '42d 18h (Fresh)',
+          cpu: 17,
+          mem: 33,
+          memDetail: '10.5 / 32 GB',
+          buffer: 20,
+          bufferDetail: '32 / 160 MB',
+          status: 'healthy',
+          ports: [
+            { name: 'swp49', peer: 'spine-01:swp4', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp50', peer: 'spine-02:swp4', speed: '800G', status: 'UP', crc: 0 },
+            { name: 'swp1', peer: 'dgx-h100-04', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        },
+        'host-01': {
+          id: 'host-01',
+          label: 'dgx-h100-01',
+          hostname: 'dgx-h100-01.dc1.nv',
+          role: 'AI COMPUTE HOST',
+          layer: 'host',
+          x: 205, y: 365,
+          model: 'NVIDIA DGX H100 | 8x ConnectX-7 400GbE',
+          vtep: '10.1.1.10 /24',
+          asn: 'VNI 10010 (Tenant-AI)',
+          bgpSummary: 'Host RoCEv2 Active',
+          temp: '54°C / Liquid Cooled',
+          uptime: '91d 04h (Fresh)',
+          cpu: 42,
+          mem: 64,
+          memDetail: '1.3 / 2.0 TB',
+          buffer: 15,
+          bufferDetail: 'NIC Ring 15%',
+          status: 'healthy',
+          ports: [
+            { name: 'enp1s0f0', peer: 'leaf-01:swp1', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        },
+        'host-02': {
+          id: 'host-02',
+          label: 'dgx-h100-02',
+          hostname: 'dgx-h100-02.dc1.nv',
+          role: 'AI COMPUTE HOST',
+          layer: 'host',
+          x: 375, y: 365,
+          model: 'NVIDIA DGX H100 | 8x ConnectX-7 400GbE',
+          vtep: '10.1.2.20 /24',
+          asn: 'VNI 10010 (Tenant-AI)',
+          bgpSummary: 'Host RoCEv2 Active',
+          temp: '55°C / Liquid Cooled',
+          uptime: '91d 04h (Fresh)',
+          cpu: 45,
+          mem: 66,
+          memDetail: '1.32 / 2.0 TB',
+          buffer: 16,
+          bufferDetail: 'NIC Ring 16%',
+          status: 'healthy',
+          ports: [
+            { name: 'enp1s0f0', peer: 'leaf-02:swp1', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        },
+        'host-03': {
+          id: 'host-03',
+          label: 'dgx-h100-03',
+          hostname: 'dgx-h100-03.dc1.nv',
+          role: 'AI COMPUTE HOST',
+          layer: 'host',
+          x: 545, y: 365,
+          model: 'NVIDIA DGX H100 | 8x ConnectX-7 400GbE',
+          vtep: '10.1.3.30 /24',
+          asn: 'VNI 10010 (Tenant-AI)',
+          bgpSummary: 'Host RoCEv2 Active',
+          temp: '53°C / Liquid Cooled',
+          uptime: '91d 04h (Fresh)',
+          cpu: 39,
+          mem: 61,
+          memDetail: '1.22 / 2.0 TB',
+          buffer: 14,
+          bufferDetail: 'NIC Ring 14%',
+          status: 'healthy',
+          ports: [
+            { name: 'enp1s0f0', peer: 'leaf-03:swp1', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        },
+        'host-04': {
+          id: 'host-04',
+          label: 'dgx-h100-04',
+          hostname: 'dgx-h100-04.dc1.nv',
+          role: 'AI COMPUTE HOST',
+          layer: 'host',
+          x: 715, y: 365,
+          model: 'NVIDIA DGX H100 | 8x ConnectX-7 400GbE',
+          vtep: '10.1.4.40 /24',
+          asn: 'VNI 10010 (Tenant-AI)',
+          bgpSummary: 'Host RoCEv2 Active',
+          temp: '54°C / Liquid Cooled',
+          uptime: '91d 04h (Fresh)',
+          cpu: 41,
+          mem: 63,
+          memDetail: '1.26 / 2.0 TB',
+          buffer: 15,
+          bufferDetail: 'NIC Ring 15%',
+          status: 'healthy',
+          ports: [
+            { name: 'enp1s0f0', peer: 'leaf-04:swp1', speed: '400G', status: 'UP', crc: 0 },
+          ]
+        }
+      },
+      links: [
+        // Spine-01 to Leaves
+        { id: 'l-s1-l1', from: 'spine-01', to: 'leaf-01', status: 'healthy', label: '800G' },
+        { id: 'l-s1-l2', from: 'spine-01', to: 'leaf-02', status: 'healthy', label: '800G' },
+        { id: 'l-s1-l3', from: 'spine-01', to: 'leaf-03', status: 'healthy', label: '800G' },
+        { id: 'l-s1-l4', from: 'spine-01', to: 'leaf-04', status: 'healthy', label: '800G' },
+        // Spine-02 to Leaves
+        { id: 'l-s2-l1', from: 'spine-02', to: 'leaf-01', status: 'healthy', label: '800G' },
+        { id: 'l-s2-l2', from: 'spine-02', to: 'leaf-02', status: 'healthy', label: '800G' },
+        { id: 'l-s2-l3', from: 'spine-02', to: 'leaf-03', status: 'healthy', label: '800G' },
+        { id: 'l-s2-l4', from: 'spine-02', to: 'leaf-04', status: 'healthy', label: '800G' },
+        // Leaves to Hosts
+        { id: 'l-l1-h1', from: 'leaf-01', to: 'host-01', status: 'healthy', label: '400G' },
+        { id: 'l-l2-h2', from: 'leaf-02', to: 'host-02', status: 'healthy', label: '400G' },
+        { id: 'l-l3-h3', from: 'leaf-03', to: 'host-03', status: 'healthy', label: '400G' },
+        { id: 'l-l4-h4', from: 'leaf-04', to: 'host-04', status: 'healthy', label: '400G' },
+      ]
+    };
+
+    /**
+     * ============================================================================
+     * 2. TOAST NOTIFICATION HELPER (Non-blocking UI feedback)
+     * ============================================================================
+     */
+    function showToast(title, message, tone = 'green') {
+      const container = document.getElementById('toast-container');
+      const colors = {
+        green: 'border-nv-green/50 bg-[#121a14] text-nv-green',
+        amber: 'border-amber-500/50 bg-[#1c1810] text-amber-400',
+        red: 'border-rose-500/50 bg-[#1e1215] text-rose-400'
+      };
+      const icons = {
+        green: 'fa-circle-check',
+        amber: 'fa-triangle-exclamation',
+        red: 'fa-circle-xmark'
+      };
+
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto border ${colors[tone] || colors.green} rounded-lg p-3 shadow-xl backdrop-blur-md transition-all duration-300 transform translate-y-2 opacity-0 flex items-start gap-2.5`;
+      toast.innerHTML = `
+        <i class="fa-solid ${icons[tone] || icons.green} mt-0.5 text-sm"></i>
+        <div class="text-xs">
+          <div class="font-semibold text-white">${title}</div>
+          <div class="text-nv-muted mt-0.5">${message}</div>
+        </div>
+      `;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4200);
+    }
+
+    /**
+     * ============================================================================
+     * 3. HEALTH VALIDATION MATRIX CARDS
+     * ============================================================================
+     */
+    function getValidationCardsData() {
+      const s = state.activeScenario;
+
+      return [
+        {
+          id: 'bgp',
+          title: 'BGP Sessions',
+          icon: 'fa-diagram-project',
+          status: s === 'bgp_flap' ? 'critical' : 'healthy',
+          metric: s === 'bgp_flap' ? '14 / 16 Est.' : '16 / 16 Est.',
+          detail: s === 'bgp_flap' ? 'leaf-02 <-> spine-01 HoldTimer Expired' : 'All eBGP unnumbered peers active',
+          cmd: 'netq check bgp'
+        },
+        {
+          id: 'evpn',
+          title: 'EVPN VXLAN',
+          icon: 'fa-layer-group',
+          status: s === 'bgp_flap' ? 'warning' : 'healthy',
+          metric: s === 'bgp_flap' ? '3 / 4 VTEPs' : '4 / 4 VTEPs',
+          detail: s === 'bgp_flap' ? 'Type-2 MAC/IP route withdrawn on leaf-02' : 'VNI 10010 & 10020 symmetric IRB synced',
+          cmd: 'netq check evpn'
+        },
+        {
+          id: 'roce',
+          title: 'RoCEv2 / Lossless',
+          icon: 'fa-bolt',
+          status: s === 'pfc_watchdog' ? 'critical' : 'healthy',
+          metric: s === 'pfc_watchdog' ? 'PFC WD Triggered' : 'Zero Packet Drop',
+          detail: s === 'pfc_watchdog' ? 'leaf-03:swp1 Q3 storm (>200ms pause)' : 'DCQCN ECN active; 0 PFC watchdog events',
+          cmd: 'netq show sensors'
+        },
+        {
+          id: 'links',
+          title: 'Interface Link Health',
+          icon: 'fa-ethernet',
+          status: s === 'crc_errors' ? 'warning' : (s === 'bgp_flap' ? 'warning' : 'healthy'),
+          metric: s === 'crc_errors' ? '11 / 12 Clean' : '12 / 12 Clean',
+          detail: s === 'crc_errors' ? 'spine-01:swp2 high symbol/CRC errors' : 'All 800G & 400G links full duplex UP',
+          cmd: 'netq check mtu'
+        },
+        {
+          id: 'optics',
+          title: 'Optical Transceivers',
+          icon: 'fa-eye',
+          status: s === 'crc_errors' ? 'warning' : 'healthy',
+          metric: s === 'crc_errors' ? 'Rx -9.8 dBm (Low)' : 'OSFP 800G Nominal',
+          detail: s === 'crc_errors' ? 'Degraded laser bias on spine-01:swp2' : 'DOM temp 38–44°C, Rx power nominal',
+          cmd: 'netq show sensors'
+        }
+      ];
+    }
+
+    function renderHealthCards() {
+      const grid = document.getElementById('health-cards-grid');
+      const cards = getValidationCardsData();
+
+      const styleMap = {
+        healthy: {
+          border: 'border-nv-border hover:border-nv-green/50',
+          badgeBg: 'bg-nv-green/15 text-nv-green border-nv-green/30',
+          badgeText: 'PASS',
+          dot: 'bg-nv-green',
+          iconColor: 'text-nv-green'
+        },
+        warning: {
+          border: 'border-amber-500/50 bg-amber-500/[0.03]',
+          badgeBg: 'bg-amber-500/15 text-amber-400 border-amber-500/40',
+          badgeText: 'WARN',
+          dot: 'bg-amber-400',
+          iconColor: 'text-amber-400'
+        },
+        critical: {
+          border: 'border-rose-500/60 bg-rose-500/[0.04]',
+          badgeBg: 'bg-rose-500/15 text-rose-400 border-rose-500/40',
+          badgeText: 'FAIL',
+          dot: 'bg-rose-500',
+          iconColor: 'text-rose-400'
+        }
+      };
+
+      grid.innerHTML = cards.map(card => {
+        const st = styleMap[card.status];
+        return `
+          <div onclick="executeNetqCommand('${card.cmd}')" title="Click to run '${card.cmd}' in NetQ CLI"
+               class="bg-nv-panel border ${st.border} rounded-xl p-3.5 transition-all cursor-pointer group flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid ${card.icon} ${st.iconColor} text-xs"></i>
+                <span class="text-xs font-semibold text-white group-hover:text-nv-green transition-colors">${card.title}</span>
+              </div>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${st.badgeBg}">
+                ${st.badgeText}
+              </span>
+            </div>
+            <div>
+              <div class="font-mono text-base font-bold text-white">${card.metric}</div>
+              <p class="text-[11px] text-nv-muted mt-0.5 line-clamp-1">${card.detail}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function runFullValidation() {
+      const btnIcon = document.getElementById('val-btn-icon');
+      btnIcon.className = 'fa-solid fa-spinner fa-spin';
+
+      setTimeout(() => {
+        btnIcon.className = 'fa-solid fa-shield-check';
+        const now = new Date();
+        document.getElementById('last-validated-badge').textContent = `Last check: ${now.toTimeString().split(' ')[0]} UTC`;
+        renderHealthCards();
+
+        executeNetqCommand('netq check bgp');
+        if (state.activeScenario === 'healthy') {
+          showToast('Fabric Validation Passed', 'All 6 Spectrum-4 switches, 16 BGP sessions, and RoCEv2 lossless queues verified.', 'green');
+        } else if (state.activeScenario === 'crc_errors') {
+          showToast('Validation Completed with Warnings', 'Detected CRC symbol errors & low Rx optical power on spine-01:swp2.', 'amber');
+        } else {
+          showToast('Validation Detected Critical Fault', 'Active fabric anomaly detected. Review NetQ CLI diagnostics below.', 'red');
+        }
+      }, 450);
+    }
+
+    /**
+     * ============================================================================
+     * 4. INTERACTIVE SPINE-LEAF SVG TOPOLOGY RENDERER
+     * ============================================================================
+     */
+    function renderTopology() {
+      const linksGroup = document.getElementById('topology-links');
+      const nodesGroup = document.getElementById('topology-nodes');
+
+      // 1. Render Links
+      linksGroup.innerHTML = state.links.map(link => {
+        const src = state.nodes[link.from];
+        const dst = state.nodes[link.to];
+
+        let stroke = '#76b900';
+        let strokeWidth = '2';
+        let animClass = 'link-flow-healthy';
+        let opacity = '0.65';
+
+        if (link.status === 'critical') {
+          stroke = '#f43f5e';
+          strokeWidth = '2.8';
+          animClass = '';
+          opacity = '0.95';
+        } else if (link.status === 'warning') {
+          stroke = '#fbbf24';
+          strokeWidth = '2.5';
+          animClass = 'link-flow-warn';
+          opacity = '0.9';
+        }
+
+        // Highlight links connected to selected node
+        const isConnectedToSelected = link.from === state.selectedNodeId || link.to === state.selectedNodeId;
+        if (isConnectedToSelected && link.status === 'healthy') {
+          opacity = '1';
+          strokeWidth = '2.6';
+        }
+
+        return `
+          <g>
+            <!-- Base Solid Line -->
+            <line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}"
+                  stroke="${stroke}" stroke-width="${strokeWidth}" stroke-opacity="0.25" />
+            <!-- Animated Packet Flow Overlay -->
+            <line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}"
+                  stroke="${stroke}" stroke-width="${strokeWidth}" stroke-opacity="${opacity}"
+                  class="${animClass}"
+                  ${link.status === 'critical' ? 'stroke-dasharray="4 4"' : ''} />
+          </g>
+        `;
+      }).join('');
+
+      // 2. Render Nodes
+      nodesGroup.innerHTML = Object.values(state.nodes).map(node => {
+        const isSelected = node.id === state.selectedNodeId;
+        const isHost = node.layer === 'host';
+        const w = isHost ? 114 : 124;
+        const h = isHost ? 52 : 58;
+        const rx = node.x - w / 2;
+        const ry = node.y - h / 2;
+
+        let borderStroke = '#30363d';
+        let statusDot = '#76b900';
+        let bgFill = '#161b22';
+
+        if (node.status === 'critical') {
+          borderStroke = '#f43f5e';
+          statusDot = '#f43f5e';
+          bgFill = '#231318';
+        } else if (node.status === 'warning') {
+          borderStroke = '#fbbf24';
+          statusDot = '#fbbf24';
+          bgFill = '#221c11';
+        } else if (isSelected) {
+          borderStroke = '#76b900';
+        }
+
+        const subTag = node.layer === 'spine' ? node.asn : (node.layer === 'leaf' ? node.vtep : node.vtep.split(' ')[0]);
+
+        return `
+          <g onclick="selectNode('${node.id}')" class="cursor-pointer group">
+            ${isSelected ? `
+              <rect x="${rx - 5}" y="${ry - 5}" width="${w + 10}" height="${h + 10}" rx="12"
+                    fill="none" stroke="${statusDot}" stroke-width="1.8" class="node-selected-ring" />
+            ` : ''}
+
+            <!-- Main Node Box -->
+            <rect x="${rx}" y="${ry}" width="${w}" height="${h}" rx="9"
+                  fill="${bgFill}" stroke="${borderStroke}" stroke-width="${isSelected ? '2.2' : '1.5'}" />
+
+            <!-- Top Status Indicator Dot -->
+            <circle cx="${rx + 14}" cy="${ry + 16}" r="4.5" fill="${statusDot}" />
+
+            <!-- Node Hostname -->
+            <text x="${rx + 25}" y="${ry + 20}" fill="#ffffff" font-size="12" font-weight="600" font-family="JetBrains Mono, monospace">
+              ${node.label}
+            </text>
+
+            <!-- Node Secondary Info (VTEP / ASN / IP) -->
+            <text x="${rx + 12}" y="${ry + 39}" fill="#8b949e" font-size="10.5" font-family="JetBrains Mono, monospace">
+              ${subTag}
+            </text>
+
+            <!-- Switch/Host Icon Badge -->
+            <text x="${rx + w - 12}" y="${ry + 20}" text-anchor="end" fill="#484f58" font-size="9.5" font-family="JetBrains Mono, monospace">
+              ${node.layer === 'host' ? 'GPU' : 'SN5600'}
+            </text>
+          </g>
+        `;
+      }).join('');
+    }
+
+    function selectNode(nodeId) {
+      state.selectedNodeId = nodeId;
+      renderTopology();
+      renderNodeInspector();
+    }
+
+    /**
+     * ============================================================================
+     * 5. NODE TELEMETRY INSPECTOR PANEL
+     * ============================================================================
+     */
+    function renderNodeInspector() {
+      const node = state.nodes[state.selectedNodeId];
+      if (!node) return;
+
+      document.getElementById('inspector-node-role').textContent = node.role;
+      document.getElementById('inspector-name').textContent = node.hostname;
+      document.getElementById('inspector-model').textContent = node.model;
+      document.getElementById('inspector-vtep').textContent = node.vtep;
+      document.getElementById('inspector-bgp').textContent = `${node.asn} (${node.bgpSummary})`;
+      document.getElementById('inspector-temp').textContent = node.temp;
+      document.getElementById('inspector-uptime').textContent = node.uptime;
+      document.getElementById('inspector-cli-node').textContent = node.label;
+
+      // Health Badge Styling
+      const badge = document.getElementById('inspector-health-badge');
+      const bgpEl = document.getElementById('inspector-bgp');
+      if (node.status === 'critical') {
+        badge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/40';
+        badge.textContent = 'CRITICAL';
+        bgpEl.className = 'font-mono font-semibold text-rose-400';
+      } else if (node.status === 'warning') {
+        badge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/40';
+        badge.textContent = 'DEGRADED';
+        bgpEl.className = 'font-mono font-semibold text-amber-400';
+      } else {
+        badge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-nv-green/15 text-nv-green border border-nv-green/30';
+        badge.textContent = 'HEALTHY';
+        bgpEl.className = 'font-mono font-semibold text-nv-green';
+      }
+
+      // Resource Bars
+      document.getElementById('inspector-cpu-val').textContent = `${node.cpu}%`;
+      const cpuBar = document.getElementById('inspector-cpu-bar');
+      cpuBar.style.width = `${node.cpu}%`;
+      cpuBar.className = `h-full transition-all duration-500 ${node.cpu > 75 ? 'bg-rose-500' : node.cpu > 55 ? 'bg-amber-400' : 'bg-nv-green'}`;
+
+      document.getElementById('inspector-mem-val').textContent = `${node.mem}% (${node.memDetail})`;
+      document.getElementById('inspector-mem-bar').style.width = `${node.mem}%`;
+
+      document.getElementById('inspector-buf-val').textContent = `${node.buffer}% (${node.bufferDetail})`;
+      const bufBar = document.getElementById('inspector-buf-bar');
+      bufBar.style.width = `${node.buffer}%`;
+      bufBar.className = `h-full transition-all duration-500 ${node.buffer > 75 ? 'bg-rose-500' : node.buffer > 50 ? 'bg-amber-400' : 'bg-nv-green'}`;
+
+      // Ports Table
+      const portsList = document.getElementById('inspector-ports-list');
+      portsList.innerHTML = node.ports.map(p => {
+        const isDown = p.status !== 'UP';
+        const hasCrc = p.crc > 0;
+        const statusColor = isDown ? 'text-rose-400' : (hasCrc ? 'text-amber-400' : 'text-nv-green');
+        return `
+          <div class="flex items-center justify-between bg-nv-bg px-2.5 py-1.5 rounded border border-nv-border">
+            <div class="flex items-center gap-2">
+              <span class="text-white font-semibold">${p.name}</span>
+              <span class="text-nv-muted">-> ${p.peer}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              ${hasCrc ? `<span class="text-[10px] text-amber-400">CRC:${p.crc}</span>` : ''}
+              <span class="text-[10px] text-nv-muted">${p.speed}</span>
+              <span class="${statusColor} font-semibold">${p.status}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function inspectSelectedNodeInCli() {
+      const node = state.nodes[state.selectedNodeId];
+      executeNetqCommand(`netq ${node.label} show lldp`);
+    }
+
+    /**
+     * ============================================================================
+     * 6. FAULT INJECTION / SCENARIO LAB CONTROLLER
+     * ============================================================================
+     */
+    function resetNodesAndLinksToBaseline() {
+      // Restore all nodes
+      state.nodes['spine-01'].status = 'healthy';
+      state.nodes['spine-01'].bgpSummary = '4/4 Established';
+      state.nodes['spine-01'].cpu = 14;
+      state.nodes['spine-01'].buffer = 18;
+      state.nodes['spine-01'].bufferDetail = '28 / 160 MB';
+      state.nodes['spine-01'].ports.forEach(p => { p.status = 'UP'; p.crc = 0; });
+
+      state.nodes['spine-02'].status = 'healthy';
+      state.nodes['spine-02'].bgpSummary = '4/4 Established';
+      state.nodes['spine-02'].cpu = 15;
+      state.nodes['spine-02'].ports.forEach(p => { p.status = 'UP'; p.crc = 0; });
+
+      state.nodes['leaf-01'].status = 'healthy';
+      state.nodes['leaf-01'].bgpSummary = '2/2 Established';
+      state.nodes['leaf-01'].ports.forEach(p => { p.status = 'UP'; p.crc = 0; });
+
+      state.nodes['leaf-02'].status = 'healthy';
+      state.nodes['leaf-02'].bgpSummary = '2/2 Established';
+      state.nodes['leaf-02'].cpu = 18;
+      state.nodes['leaf-02'].buffer = 22;
+      state.nodes['leaf-02'].bufferDetail = '35 / 160 MB';
+      state.nodes['leaf-02'].ports.forEach(p => { p.status = 'UP'; p.crc = 0; });
+
+      state.nodes['leaf-03'].status = 'healthy';
+      state.nodes['leaf-03'].bgpSummary = '2/2 Established';
+      state.nodes['leaf-03'].cpu = 21;
+      state.nodes['leaf-03'].buffer = 25;
+      state.nodes['leaf-03'].bufferDetail = '40 / 160 MB';
+      state.nodes['leaf-03'].ports.forEach(p => { p.status = 'UP'; p.crc = 0; });
+
+      state.nodes['leaf-04'].status = 'healthy';
+      state.nodes['leaf-04'].bgpSummary = '2/2 Established';
+      state.nodes['leaf-04'].ports.forEach(p => { p.status = 'UP'; p.crc = 0; });
+
+      ['host-01', 'host-02', 'host-03', 'host-04'].forEach(h => {
+        state.nodes[h].status = 'healthy';
+        state.nodes[h].bgpSummary = 'Host RoCEv2 Active';
+        state.nodes[h].ports.forEach(p => { p.status = 'UP'; p.crc = 0; });
+      });
+
+      state.links.forEach(l => { l.status = 'healthy'; });
+    }
+
+    function applyScenario(scenarioKey) {
+      state.activeScenario = scenarioKey;
+      resetNodesAndLinksToBaseline();
+
+      const pill = document.getElementById('active-scenario-pill');
+      const globalDot = document.getElementById('global-status-dot');
+
+      if (scenarioKey === 'healthy') {
+        pill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-nv-green/15 text-nv-green border border-nv-green/30';
+        pill.textContent = 'ACTIVE: Nominal Baseline';
+        globalDot.className = 'w-2.5 h-2.5 rounded-full bg-nv-green shadow-[0_0_8px_#76b900]';
+        showToast('Healthy Fabric Restored', 'All BGP EVPN sessions, 800G ISLs, and RoCEv2 buffers returned to nominal state.', 'green');
+        appendSystemEventToTerminal('[NETQ EVENT] Fabric baseline restored. All 6 nodes reporting healthy telemetry.');
+      }
+
+      else if (scenarioKey === 'bgp_flap') {
+        state.nodes['leaf-02'].status = 'critical';
+        state.nodes['leaf-02'].bgpSummary = '1/2 Est (swp49 DOWN)';
+        state.nodes['leaf-02'].cpu = 64;
+        state.nodes['leaf-02'].ports[0].status = 'DOWN';
+
+        state.nodes['spine-01'].status = 'warning';
+        state.nodes['spine-01'].bgpSummary = '3/4 Established';
+        state.nodes['spine-01'].ports[1].status = 'DOWN';
+
+        const link = state.links.find(l => l.id === 'l-s1-l2');
+        if (link) link.status = 'critical';
+
+        selectNode('leaf-02');
+        pill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/40';
+        pill.textContent = 'FAULT: BGP Flap on leaf-02';
+        globalDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]';
+
+        showToast('Fault Injected: BGP Flap', 'BGP session leaf-02:swp49 <-> spine-01:swp2 transitioned to Active/Idle.', 'red');
+        appendSystemEventToTerminal('[WJH ALERT] BGP Neighbor 169.254.0.1 (spine-01) on leaf-02:swp49 went DOWN (Hold Timer Expired). EVPN Type-2 routes reconverging via spine-02.');
+      }
+
+      else if (scenarioKey === 'crc_errors') {
+        state.nodes['spine-01'].status = 'warning';
+        state.nodes['spine-01'].ports[1].crc = 4821;
+        state.nodes['leaf-02'].status = 'warning';
+        state.nodes['leaf-02'].ports[0].crc = 4821;
+
+        const link = state.links.find(l => l.id === 'l-s1-l2');
+        if (link) link.status = 'warning';
+
+        selectNode('spine-01');
+        pill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/40';
+        pill.textContent = 'FAULT: Link CRC / Optical Degradation';
+        globalDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]';
+
+        showToast('Fault Injected: Link CRC Errors', 'High post-FEC symbol errors & Rx optical power drop (-9.8 dBm) on spine-01:swp2.', 'amber');
+        appendSystemEventToTerminal('[NETQ SENSOR] Optical Rx power degradation (-9.8 dBm) & 4,821 CRC errors detected on spine-01:swp2 <-> leaf-02:swp49.');
+      }
+
+      else if (scenarioKey === 'pfc_watchdog') {
+        state.nodes['leaf-03'].status = 'critical';
+        state.nodes['leaf-03'].buffer = 94;
+        state.nodes['leaf-03'].bufferDetail = '150 / 160 MB (CONGESTED)';
+        state.nodes['leaf-03'].cpu = 78;
+
+        state.nodes['host-03'].status = 'critical';
+        state.nodes['host-03'].bgpSummary = 'PFC Pause Storm (Q3)';
+
+        const link = state.links.find(l => l.id === 'l-l3-h3');
+        if (link) link.status = 'critical';
+
+        selectNode('leaf-03');
+        pill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/40';
+        pill.textContent = 'FAULT: PFC Watchdog Triggered';
+        globalDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]';
+
+        showToast('Fault Injected: PFC Watchdog', 'Sustained Priority Flow Control pause storm on leaf-03:swp1 (Priority 3).', 'red');
+        appendSystemEventToTerminal('[WJH CRITICAL] RoCEv2 PFC Watchdog triggered on leaf-03:swp1 Traffic Class 3! Continuous XOFF frames from dgx-h100-03 (>200ms). Dropping tail packets to prevent head-of-line blocking.');
+      }
+
+      renderHealthCards();
+      renderTopology();
+      renderNodeInspector();
+    }
+
+    /**
+     * ============================================================================
+     * 7. SIMULATED NETQ CLI TERMINAL EMULATOR
+     * ============================================================================
+     */
+    const terminalOutput = document.getElementById('terminal-output');
+    const terminalForm = document.getElementById('terminal-form');
+    const terminalInput = document.getElementById('terminal-input');
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function appendSystemEventToTerminal(msg) {
+      const div = document.createElement('div');
+      div.className = 'text-amber-300/90 bg-amber-500/10 border-l-2 border-amber-400 pl-2.5 py-1';
+      div.textContent = msg;
+      terminalOutput.appendChild(div);
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    function clearTerminal() {
+      terminalOutput.innerHTML = '';
+      printWelcomeBanner();
+    }
+
+    function printWelcomeBanner() {
+      const banner = document.createElement('div');
+      banner.className = 'text-nv-muted border-b border-nv-border pb-2.5';
+      banner.innerHTML = `
+        <div class="text-nv-green font-semibold">NVIDIA NetQ Telemetry &amp; Validation CLI (v4.12.0)</div>
+        <div>Connected to NetQ Telemetry Server <span class="text-white">10.255.0.100</span> | Fabric: <span class="text-white">DC1-AI-POD01</span></div>
+        <div class="mt-1">Type <span class="text-white">help</span> or click any preset command above to inspect live fabric state.</div>
+      `;
+      terminalOutput.appendChild(banner);
+    }
+
+    function generateNetqResponse(rawCmd) {
+      const cmd = rawCmd.trim().toLowerCase();
+      const s = state.activeScenario;
+
+      if (cmd === 'help' || cmd === 'netq help') {
+        return `<span class="text-nv-green">Available NetQ Lab Commands:</span>
+  netq show agents                         Show status &amp; version of NetQ agents across all nodes
+  netq check bgp                           Validate eBGP underlay &amp; EVPN overlay sessions
+  netq check evpn                          Verify VXLAN VTEPs, VNIs, and MAC/IP route consistency
+  netq trace 10.1.1.10 from 10.1.2.20      Trace ECMP overlay/underlay path between DGX hosts
+  netq show sensors                        Inspect ASIC thermals, fans, optical DOM, and RoCEv2 counters
+  netq check mtu                           Verify end-to-end Jumbo Frame MTU (9216) across ISLs
+  netq &lt;node&gt; show lldp                    Inspect LLDP neighbor table on a specific switch`;
+      }
+
+      if (cmd === 'netq show agents') {
+        const l2Status = s === 'bgp_flap' ? '<span class="text-amber-400">Warning (1 peer down)</span>' : '<span class="text-nv-green">Fresh</span>';
+        const l3Status = s === 'pfc_watchdog' ? '<span class="text-rose-400">Alert (PFC-WD)</span>' : '<span class="text-nv-green">Fresh</span>';
+        return `Matching agents records:
+Hostname             Status     Version        Sys Uptime        Agent Uptime      Last Checked
+-------------------- ---------- -------------- ----------------- ----------------- --------------
+spine-01.dc1.nv      <span class="text-nv-green">Fresh</span>      4.12.0-cl5.9   68d 11h 14m       68d 11h 12m       1s ago
+spine-02.dc1.nv      <span class="text-nv-green">Fresh</span>      4.12.0-cl5.9   68d 11h 12m       68d 11h 10m       1s ago
+leaf-01.dc1.nv       <span class="text-nv-green">Fresh</span>      4.12.0-cl5.9   42d 18h 05m       42d 18h 03m       1s ago
+leaf-02.dc1.nv       ${l2Status}      4.12.0-cl5.9   42d 18h 02m       42d 18h 00m       1s ago
+leaf-03.dc1.nv       ${l3Status}      4.12.0-cl5.9   42d 17h 58m       42d 17h 55m       1s ago
+leaf-04.dc1.nv       <span class="text-nv-green">Fresh</span>      4.12.0-cl5.9   42d 17h 50m       42d 17h 48m       1s ago
+dgx-h100-01.dc1.nv   <span class="text-nv-green">Fresh</span>      4.12.0-ubuntu  91d 04h 22m       91d 04h 20m       2s ago
+dgx-h100-02.dc1.nv   <span class="text-nv-green">Fresh</span>      4.12.0-ubuntu  91d 04h 19m       91d 04h 18m       2s ago
+dgx-h100-03.dc1.nv   <span class="text-nv-green">Fresh</span>      4.12.0-ubuntu  91d 04h 15m       91d 04h 14m       2s ago
+dgx-h100-04.dc1.nv   <span class="text-nv-green">Fresh</span>      4.12.0-ubuntu  91d 04h 11m       91d 04h 10m       2s ago`;
+      }
+
+      if (cmd === 'netq check bgp') {
+        if (s === 'bgp_flap') {
+          return `<span class="text-rose-400 font-semibold">Checked 16 BGP sessions: 14 Passed, 2 Failed</span>
+Hostname          VRF       Peer Name         Peer Interface   State         Reason
+----------------- --------- ----------------- ---------------- ------------- ----------------------------
+leaf-02.dc1.nv    default   spine-01.dc1.nv   swp49            <span class="text-rose-400">Active (Down)</span> Hold Timer Expired (9s ago)
+spine-01.dc1.nv   default   leaf-02.dc1.nv    swp2             <span class="text-rose-400">Idle (Down)</span>   Peer Interface Link Down
+<span class="text-nv-muted">All remaining 14 eBGP unnumbered sessions are in Established state.</span>`;
+        }
+        return `<span class="text-nv-green font-semibold">Checked 16 BGP sessions: 16 Passed, 0 Failed</span>
+Address Family: IPv4 Unicast &amp; L2VPN EVPN (BGP Unnumbered RFC 5549)
+Total Nodes Checked: 6 | Total Sessions: 16 | Established: 16 | Failed: 0
+All spine-leaf underlay &amp; EVPN route-reflector sessions healthy.`;
+      }
+
+      if (cmd === 'netq check evpn') {
+        if (s === 'bgp_flap') {
+          return `<span class="text-amber-400 font-semibold">Checked EVPN Overlay: 1 Warning Detected</span>
+VTEP Checks: 4 VTEPs discovered (10.255.0.11 - 10.255.0.14)
+VNI Checks:  VNI 10010 (Tenant-AI-Compute), VNI 10020 (Storage-NVMeoF)
+<span class="text-amber-400">[WARN]</span> leaf-02.dc1.nv (10.255.0.12) lost ECMP redundancy to spine-01.
+       Type-2 MAC/IP 00:02:c9:a1:44:02 (10.1.2.20) reachable solely via spine-02.`;
+        }
+        return `<span class="text-nv-green font-semibold">Checked EVPN Overlay: All 12 Checks Passed, 0 Failed</span>
+VTEP Checks:   4/4 VTEPs active (10.255.0.11, 10.255.0.12, 10.255.0.13, 10.255.0.14)
+VNI Consistency: VNI 10010 &amp; VNI 10020 configured consistently across all 4 leaves
+Type-2 / Type-5 Routes: 100% synchronized across Spine Route Reflectors (spine-01, spine-02)`;
+      }
+
+      if (cmd.startsWith('netq trace')) {
+        if (s === 'bgp_flap') {
+          return `Trace from <span class="text-white">dgx-h100-02 (10.1.2.20)</span> to <span class="text-white">dgx-h100-01 (10.1.1.10)</span> [VNI 10010, MTU 9216]:
+  <span class="text-amber-400">Notice: ECMP degraded to single path (leaf-02:swp49 -> spine-01 unavailable)</span>
+  Path 1 (Active):
+    dgx-h100-02 (enp1s0f0) ──400G──&gt; leaf-02 (swp1) [VTEP Encap: 10.255.0.12 -&gt; 10.255.0.11]
+    leaf-02 (swp50)        ──800G──&gt; spine-02 (swp2)
+    spine-02 (swp1)        ──800G──&gt; leaf-01 (swp50) [VTEP Decap: VNI 10010]
+    leaf-01 (swp1)         ──400G──&gt; dgx-h100-01 (enp1s0f0) <span class="text-nv-green">[REACHABLE - 1.4 µs]</span>`;
+        }
+        const crcNote = s === 'crc_errors' ? ' <span class="text-amber-400">[WARN: FEC Symbol Errors on Path 1]</span>' : '';
+        return `Trace from <span class="text-white">dgx-h100-02 (10.1.2.20)</span> to <span class="text-white">dgx-h100-01 (10.1.1.10)</span> [VNI 10010, MTU 9216]:
+  2 Equal-Cost Multi-Path (ECMP) RoCEv2 flows verified:
+  Path 1 (50% Hash):
+    dgx-h100-02 (enp1s0f0) ──400G──&gt; leaf-02 (swp1) ──800G──&gt; spine-01 (swp2) ──800G──&gt; leaf-01 (swp49) ──&gt; dgx-h100-01${crcNote}
+  Path 2 (50% Hash):
+    dgx-h100-02 (enp1s0f0) ──400G──&gt; leaf-02 (swp1) ──800G──&gt; spine-02 (swp2) ──800G──&gt; leaf-01 (swp50) ──&gt; dgx-h100-01
+  <span class="text-nv-green">End-to-End Path Validation: SUCCESS (Zero Drops, ECN Capable Transport)</span>`;
+      }
+
+      if (cmd === 'netq show sensors') {
+        const optStatus = s === 'crc_errors'
+          ? 'spine-01:swp2   OSFP-800G-SR8   43.1°C   <span class="text-amber-400">-9.82 dBm (LOW)</span>   <span class="text-amber-400">CRC: 4,821</span>'
+          : 'spine-01:swp2   OSFP-800G-SR8   39.4°C   -1.45 dBm (OK)      CRC: 0';
+        const pfcStatus = s === 'pfc_watchdog'
+          ? 'leaf-03:swp1    Q3 (RoCEv2)     <span class="text-rose-400">MMU: 94% (FULL)</span>   <span class="text-rose-400">PFC Watchdog: TRIGGERED (Drops: 18,420)</span>'
+          : 'leaf-03:swp1    Q3 (RoCEv2)     MMU: 25% (OK)     PFC Watchdog: Armed (0 triggers)';
+
+        return `Hardware &amp; RoCEv2 Telemetry Sensors Summary:
+  Interface       Transceiver     Temp     Rx Optical Power    Error / Queue Telemetry
+  --------------- --------------- -------- ------------------- -------------------------------------------
+  spine-01:swp1   OSFP-800G-SR8   38.9°C   -1.32 dBm (OK)      CRC: 0
+  ${optStatus}
+  ${pfcStatus}
+  leaf-01:swp1    OSFP-400G-DR4   41.2°C   -1.18 dBm (OK)      ECN Marked: 14,210 pkts/s | PFC: 0`;
+      }
+
+      if (cmd === 'netq check mtu') {
+        if (s === 'crc_errors') {
+          return `<span class="text-amber-400 font-semibold">Checked MTU across 12 fabric links: 12 MTU Matched (9216), 1 Link Quality Warning</span>
+  All ISL &amp; Host interfaces configured with Jumbo MTU 9216 bytes (VXLAN overhead ready).
+  <span class="text-amber-400">[WARN]</span> spine-01:swp2 <-> leaf-02:swp49 experiencing physical layer symbol errors; re-seat OSFP optic.`;
+        }
+        return `<span class="text-nv-green font-semibold">Checked MTU across 12 fabric links: 12 Passed, 0 Failed</span>
+  Underlay ISL MTU:  9216 bytes (All 8x 800GbE links verified)
+  Host Edge MTU:     9000 bytes (All 4x 400GbE DGX H100 links verified)
+  VXLAN Encap Headroom: 216 bytes available (Optimal for RoCEv2 4096B payload)`;
+      }
+
+      // Dynamic node LLDP lookup: e.g., "netq leaf-02 show lldp"
+      const lldpMatch = cmd.match(/^netq\s+([a-z0-9-]+)\s+show\s+lldp$/);
+      if (lldpMatch) {
+        const targetLabel = lldpMatch[1];
+        const foundNode = Object.values(state.nodes).find(n => n.label.toLowerCase() === targetLabel);
+        if (foundNode) {
+          const rows = foundNode.ports.map(p =>
+            `  ${foundNode.hostname.padEnd(18)} ${p.name.padEnd(10)} ${p.peer.padEnd(18)} ${p.speed.padEnd(6)} ${p.status === 'UP' ? '<span class="text-nv-green">UP</span>' : '<span class="text-rose-400">DOWN</span>'}`
+          ).join('\n');
+          return `LLDP Neighbors for <span class="text-white">${foundNode.hostname}</span>:
+  Local Host         Local Port Remote Peer        Speed  Link
+  ------------------ ---------- ------------------ ------ ----
+${rows}`;
+        }
+      }
+
+      return `<span class="text-rose-400">Unrecognized NetQ command:</span> '${escapeHtml(rawCmd)}'. Type <span class="text-white">help</span> to view supported commands.`;
+    }
+
+    function executeNetqCommand(cmdText) {
+      const trimmed = cmdText.trim();
+      if (!trimmed) return;
+
+      // Save to history
+      state.commandHistory.unshift(trimmed);
+      state.historyIndex = -1;
+
+      // Render prompt + command
+      const entry = document.createElement('div');
+      entry.className = 'space-y-1';
+
+      const promptLine = document.createElement('div');
+      promptLine.innerHTML = `<span class="text-nv-green font-semibold">cumulus@netq-ts-01:~$</span> <span class="text-white font-semibold">${escapeHtml(trimmed)}</span>`;
+
+      const outputBlock = document.createElement('pre');
+      outputBlock.className = 'whitespace-pre-wrap font-mono text-xs text-gray-300 pl-2 border-l border-nv-border/80 leading-relaxed';
+      outputBlock.innerHTML = generateNetqResponse(trimmed);
+
+      entry.appendChild(promptLine);
+      entry.appendChild(outputBlock);
+      terminalOutput.appendChild(entry);
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    terminalForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = terminalInput.value;
+      if (val.trim()) {
+        executeNetqCommand(val);
+        terminalInput.value = '';
+      }
+    });
+
+    // Up/Down arrow history navigation
+    terminalInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (state.historyIndex + 1 < state.commandHistory.length) {
+          state.historyIndex++;
+          terminalInput.value = state.commandHistory[state.historyIndex];
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (state.historyIndex > 0) {
+          state.historyIndex--;
+          terminalInput.value = state.commandHistory[state.historyIndex];
+        } else {
+          state.historyIndex = -1;
+          terminalInput.value = '';
+        }
+      }
+    });
+
+    /**
+     * ============================================================================
+     * 8. LIVE HTML5 CANVAS CHARTS (Throughput & RoCEv2 ECN/PFC)
+     * ============================================================================
+     */
+    function drawLineChart(canvasId, seriesList, maxVal, unitSuffix) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      const padLeft = 36;
+      const padRight = 10;
+      const padTop = 10;
+      const padBottom = 18;
+      const plotW = w - padLeft - padRight;
+      const plotH = h - padTop - padBottom;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Horizontal Grid Lines & Y-Axis Labels
+      ctx.strokeStyle = '#21262d';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'right';
+
+      const gridSteps = 3;
+      for (let i = 0; i <= gridSteps; i++) {
+        const y = padTop + (plotH / gridSteps) * i;
+        const val = (maxVal * (1 - i / gridSteps)).toFixed(maxVal < 10 ? 1 : 0);
+
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(w - padRight, y);
+        ctx.stroke();
+
+        ctx.fillText(`${val}${unitSuffix}`, padLeft - 5, y + 3);
+      }
+
+      // Draw each data series
+      seriesList.forEach(series => {
+        const data = series.data;
+        if (data.length < 2) return;
+
+        const stepX = plotW / (data.length - 1);
+
+        // Area Fill
+        if (series.fillColor) {
+          ctx.beginPath();
+          data.forEach((val, idx) => {
+            const x = padLeft + idx * stepX;
+            const clamped = Math.min(Math.max(val, 0), maxVal);
+            const y = padTop + plotH - (clamped / maxVal) * plotH;
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.lineTo(padLeft + (data.length - 1) * stepX, padTop + plotH);
+          ctx.lineTo(padLeft, padTop + plotH);
+          ctx.closePath();
+          ctx.fillStyle = series.fillColor;
+          ctx.fill();
+        }
+
+        // Stroke Line
+        ctx.beginPath();
+        data.forEach((val, idx) => {
+          const x = padLeft + idx * stepX;
+          const clamped = Math.min(Math.max(val, 0), maxVal);
+          const y = padTop + plotH - (clamped / maxVal) * plotH;
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = series.strokeColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
+    function tickTelemetry() {
+      const s = state.activeScenario;
+      const tSeries = state.telemetrySeries.throughput;
+      const ecnSeries = state.telemetrySeries.ecn;
+      const pfcSeries = state.telemetrySeries.pfc;
+
+      let nextThroughput = 3.85 + (Math.random() - 0.5) * 0.35;
+      let nextEcn = 14 + (Math.random() - 0.5) * 4;
+      let nextPfc = 0;
+
+      if (s === 'bgp_flap') {
+        nextThroughput = 2.65 + (Math.random() - 0.5) * 0.3;
+        nextEcn = 22 + (Math.random() - 0.5) * 5;
+      } else if (s === 'crc_errors') {
+        nextThroughput = 3.15 + (Math.random() - 0.5) * 0.45;
+        nextEcn = 28 + (Math.random() - 0.5) * 6;
+      } else if (s === 'pfc_watchdog') {
+        nextThroughput = 1.45 + (Math.random() - 0.5) * 0.4;
+        nextEcn = 46 + (Math.random() - 0.5) * 6;
+        nextPfc = 38 + (Math.random() - 0.5) * 10;
+      }
+
+      tSeries.push(nextThroughput);
+      tSeries.shift();
+
+      ecnSeries.push(nextEcn);
+      ecnSeries.shift();
+
+      pfcSeries.push(nextPfc);
+      pfcSeries.shift();
+
+      // Update numeric readouts
+      const tpEl = document.getElementById('throughput-live-val');
+      tpEl.textContent = `${nextThroughput.toFixed(2)} Tbps`;
+      tpEl.className = `text-base font-bold ${s === 'pfc_watchdog' ? 'text-rose-400' : (s !== 'healthy' ? 'text-amber-400' : 'text-nv-green')}`;
+
+      document.getElementById('ecn-live-val').textContent = `${nextEcn.toFixed(1)}k/s`;
+      const pfcEl = document.getElementById('pfc-live-val');
+      pfcEl.textContent = nextPfc > 0 ? `${nextPfc.toFixed(1)}k/s` : '0/s';
+      pfcEl.className = nextPfc > 0 ? 'text-rose-400 block font-semibold' : 'text-amber-400 block font-semibold';
+
+      // Render both charts
+      drawLineChart('throughput-canvas', [
+        {
+          data: tSeries,
+          strokeColor: s === 'pfc_watchdog' ? '#f43f5e' : '#76b900',
+          fillColor: s === 'pfc_watchdog' ? 'rgba(244, 63, 94, 0.14)' : 'rgba(118, 185, 0, 0.14)'
+        }
+      ], 6.4, 'T');
+
+      drawLineChart('roce-canvas', [
+        {
+          data: ecnSeries,
+          strokeColor: '#22d3ee',
+          fillColor: 'rgba(34, 211, 238, 0.10)'
+        },
+        {
+          data: pfcSeries,
+          strokeColor: '#f59e0b',
+          fillColor: 'rgba(245, 158, 11, 0.16)'
+        }
+      ], 60, 'k');
+    }
+
+    function updateUtcClock() {
+      const now = new Date();
+      document.getElementById('utc-clock').textContent = now.toISOString().substring(11, 19) + ' UTC';
+    }
+
+    /**
+     * ============================================================================
+     * 9. INITIALIZATION ON WINDOW LOAD
+     * ============================================================================
+     */
+    window.addEventListener('load', () => {
+      updateUtcClock();
+      renderHealthCards();
+      renderTopology();
+      renderNodeInspector();
+      printWelcomeBanner();
+      tickTelemetry();
+
+      setInterval(updateUtcClock, 1000);
+      setInterval(tickTelemetry, 1400);
+    });
+
+    window.addEventListener('resize', () => {
+      tickTelemetry();
+    });
+  </script>
+</body>
+</html>
