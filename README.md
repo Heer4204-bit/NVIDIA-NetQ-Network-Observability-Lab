@@ -59,8 +59,11 @@ GitHub Pages| Static website deployment
 
 # 🏗️ Project Structure
 NVIDIA-NetQ-Network-Observability-Lab/
+
 │
+
 ├── backend/
+
 │   ├── app.py
 │   └── network_monitor.py
 │
