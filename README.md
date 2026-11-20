@@ -9,7 +9,8 @@
 # 🌐 Live Demo
 https://heer4204-bit.github.io/NVIDIA-NetQ-Network-Observability-Lab/
 
-"Launch NVIDIA NetQ Network Observability Lab" (https://heer4204-bit.github.io/NVIDIA-NetQ-Network-Observability-Lab/)
+# 🔎 Launch NVIDIA NetQ Network Observability Lab
+https://heer4204-bit.github.io/NVIDIA-NetQ-Network-Observability-Lab/
 
 # 📌 About the Project
 NVIDIA NetQ Network Observability Lab is an interactive educational project inspired by modern data center networking, network observability, and AI infrastructure monitoring concepts.
