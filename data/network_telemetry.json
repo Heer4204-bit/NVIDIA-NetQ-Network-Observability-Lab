@@ -1,0 +1,107 @@
+
+{
+  "project": "NVIDIA NetQ Network Observability Lab",
+  "dataset": "Network Telemetry",
+  "version": "1.0.0",
+  "data_type": "Educational Simulation",
+  "last_updated": "2026-11-20T08:00:00Z",
+
+  "network_summary": {
+    "total_devices": 5,
+    "online_devices": 3,
+    "warning_devices": 1,
+    "offline_devices": 1,
+    "average_latency_ms": 31.25
+  },
+
+  "devices": [
+    {
+      "device_id": "SW-01",
+      "device_name": "Core Switch",
+      "device_type": "Switch",
+      "status": "Online",
+      "latency_ms": 12,
+      "packet_loss_percent": 0,
+      "traffic_mbps": 850,
+      "uptime_percent": 99.98
+    },
+    {
+      "device_id": "SW-02",
+      "device_name": "Distribution Switch",
+      "device_type": "Switch",
+      "status": "Online",
+      "latency_ms": 18,
+      "packet_loss_percent": 0.2,
+      "traffic_mbps": 620,
+      "uptime_percent": 99.95
+    },
+    {
+      "device_id": "RTR-01",
+      "device_name": "Main Router",
+      "device_type": "Router",
+      "status": "Warning",
+      "latency_ms": 85,
+      "packet_loss_percent": 3.5,
+      "traffic_mbps": 950,
+      "uptime_percent": 98.50
+    },
+    {
+      "device_id": "SRV-01",
+      "device_name": "Network Server",
+      "device_type": "Server",
+      "status": "Online",
+      "latency_ms": 10,
+      "packet_loss_percent": 0,
+      "traffic_mbps": 420,
+      "uptime_percent": 99.99
+    },
+    {
+      "device_id": "SW-03",
+      "device_name": "Access Switch",
+      "device_type": "Switch",
+      "status": "Offline",
+      "latency_ms": null,
+      "packet_loss_percent": 100,
+      "traffic_mbps": 0,
+      "uptime_percent": 95.20
+    }
+  ],
+
+  "network_links": [
+    {
+      "source": "SW-01",
+      "target": "SW-02",
+      "status": "Connected"
+    },
+    {
+      "source": "SW-02",
+      "target": "RTR-01",
+      "status": "Warning"
+    },
+    {
+      "source": "SW-02",
+      "target": "SW-03",
+      "status": "Disconnected"
+    },
+    {
+      "source": "SW-01",
+      "target": "SRV-01",
+      "status": "Connected"
+    }
+  ],
+
+  "alerts": [
+    {
+      "alert_id": "ALT-001",
+      "device_id": "RTR-01",
+      "severity": "Warning",
+      "message": "High network latency detected."
+    },
+    {
+      "alert_id": "ALT-002",
+      "device_id": "SW-03",
+      "severity": "Critical",
+      "message": "Network device is offline."
+    }
+  ]
+}
