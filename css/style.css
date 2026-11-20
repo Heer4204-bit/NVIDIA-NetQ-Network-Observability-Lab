@@ -1,0 +1,120 @@
+
+/* =================================
+   NVIDIA NetQ Network Observability
+   Main Stylesheet
+================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #0b1120;
+    color: #f1f5f9;
+    line-height: 1.6;
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: auto;
+}
+
+header {
+    background: #111c2e;
+    padding: 20px;
+    border-bottom: 1px solid #263449;
+}
+
+header h1 {
+    color: #76b900;
+    font-size: 25px;
+}
+
+nav {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+nav a {
+    color: #cbd5e1;
+    text-decoration: none;
+}
+
+nav a:hover {
+    color: #76b900;
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin: 30px 0;
+}
+
+.card {
+    background: #162238;
+    border: 1px solid #293b55;
+    border-radius: 12px;
+    padding: 22px;
+}
+
+.card h3 {
+    color: #94a3b8;
+    font-size: 15px;
+}
+
+.card .value {
+    font-size: 30px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.status-online {
+    color: #22c55e;
+}
+
+.status-warning {
+    color: #f59e0b;
+}
+
+.status-offline {
+    color: #ef4444;
+}
+
+button {
+    background: #76b900;
+    color: #07100a;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #8bd000;
+}
+
+footer {
+    text-align: center;
+    padding: 25px;
+    color: #94a3b8;
+    border-top: 1px solid #263449;
+}
+
+@media (max-width: 600px) {
+    .container {
+        width: 94%;
+    }
+
+    header h1 {
+        font-size: 20px;
+    }
+}
