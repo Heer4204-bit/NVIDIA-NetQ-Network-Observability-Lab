@@ -41,7 +41,7 @@ It is designed to help learners understand network monitoring, troubleshooting, 
 
 3. Fault Injection Lab
 
-<img width="4320" height="3240" alt="16144" src="https://github.com/user-attachments/assets/9a37511d-0bc3-402c-8f26-c91942f98bff" />
+<img width="4320" height="3240" alt="16144" src="https://github.com/user-attachments/assets/fa71d619-92bd-4d14-b886-c0bd9901f444" />
 
 4. NetQ CLI Diagnostics
 
